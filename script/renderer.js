@@ -76,26 +76,6 @@ export default class Renderer {
         const { ctx, state, DPR } = game;
         const p = game.player;
 
-        // ★ バリア中ならオーラを描く（先に後ろに描く）
-        if (state.barrierActive) {
-            const radius = p.w * 1.2;   // オーラの大きさ（調整可）
-            const centerX = p.x + p.w / 2;
-            const centerY = p.y + p.h / 2;
-
-            const grd = ctx.createRadialGradient(
-                centerX, centerY, radius * 0.2,
-                centerX, centerY, radius
-            );
-
-            grd.addColorStop(0, "rgba(120, 220, 255, 0.55)");  // 中心明るく
-            grd.addColorStop(1, "rgba(120, 220, 255, 0.0)");   // 外へ消える
-
-            ctx.fillStyle = grd;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
         ctx.strokeStyle = "#e8eaed";
         ctx.lineWidth = Math.max(2, 2 * DPR);
 
@@ -146,6 +126,35 @@ export default class Renderer {
             hipY_local + legLengthY
         );
         ctx.stroke();
+
+        // ★ バリアがアクティブなら輪郭を強調して描く（縁取り＋オーラ）
+        if (game.state.barrierActive) {
+            const ctx = game.ctx;
+            const p = game.player;
+
+            const cx = p.x + p.w / 2;
+            const cy = p.y + p.h / 2;
+            const radius = Math.max(p.w, p.h) * 0.6;
+
+            ctx.save();
+
+            // === ① 外側のクッキリ縁取り ===
+            ctx.strokeStyle = "#00ffff";           // くっきりシアン
+            ctx.lineWidth = 1 * game.DPR;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // === ② 内側の淡い光（オーラ） ===
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.35)";  // 半透明シアン
+            ctx.lineWidth = 18 * game.DPR;                // 太めのぼかし線
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius - 12, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
     }
 
     static drawEnemy(game, e) {

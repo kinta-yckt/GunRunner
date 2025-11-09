@@ -1,28 +1,37 @@
+// obstacle.js
 export default class Obstacle {
-  constructor(game) {
+  constructor(game, opts = {}) {
     const { canvas, state, DPR } = game;
     this.type = "obstacle";
     this.alive = true;
 
-    // サイズ
+    // ← 追加: 空中(air)か地上かを指定
+    this.air = !!opts.air;
+
+    // サイズ（そのまま/お好みで調整可）
     this.w = 20 * DPR;
     this.h = 30 * DPR;
 
-    // 地面に固定
+    // 生成位置（右端）
     this.x = canvas.width + Math.random() * 200;
-    this.y = canvas.height - state.groundH * DPR - this.h;
 
-    // 左へ流れるスピード（敵と同等）
+    // ↓ 地上 or 空中の Y を切り替え
+    if (this.air) {
+      const groundY = canvas.height - state.groundH * DPR;
+      const minY = groundY - 200 * DPR; // 高い
+      const maxY = groundY - 90 * DPR; // 低い（地面より上）
+      this.y = minY + Math.random() * (maxY - minY);
+    } else {
+      this.y = canvas.height - state.groundH * DPR - this.h;
+    }
+
+    // 背景（手前）と同じ流れで左へ
     this.speed = state.scrollSpeed;
   }
 
   update(dt, game) {
-    // Move with the foreground (near) scroll speed
     const speed = game.state.scrollSpeed * game.DPR;
     this.x -= speed * dt;
-    // offscreen cull
     if (this.x + this.w < 0) this.alive = false;
-
-    this.x = Math.round(this.x);
   }
 }
