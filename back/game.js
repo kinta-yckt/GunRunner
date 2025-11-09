@@ -4,7 +4,6 @@ import Enemy from "./enemy.js";
 import Renderer from "./renderer.js";
 import Utils from "./utils.js";
 import Obstacle from "./obstacle.js";
-import Item from "./item.js";
 
 export default class Game {
   constructor() {
@@ -24,17 +23,10 @@ export default class Game {
       lives: 3,
       gravity: 0.0025,
       groundH: 90,
-      scrollSpeed: 0.35,
+      scrollSpeed: 0.3,
       stage: 1,
       stageTime: 0,
-      stageDuration: 40000,
-      fireBoostActive: false,
-      fireBoostTime: 0,
-      fireIntervalNormal: 800,
-      fireIntervalBoost: 300,
-
-      barrierActive: false,
-      barrierTime: 0,
+      stageDuration: 3000,
     };
 
     this.player = new Player(this);
@@ -42,7 +34,6 @@ export default class Game {
     this.bullets = [];
     this.enemies = [];
     this.obstacles = [];
-    this.bgObstacle = 0;
 
     this.bg = { near: 0, far: 0 };
 
@@ -62,15 +53,12 @@ export default class Game {
       ["#541003ff", "#FFA840"],
     ];
 
-    this.items = [];
-
     this.initInput();
-
   }
 
   resizeCanvas() {
     const cssW = Math.min(900, window.innerWidth * 0.95);
-    const cssH = Math.max(320, Math.floor(window.innerHeight * 0.80));
+    const cssH = Math.max(320, Math.floor(window.innerHeight * 0.55));
 
     this.canvas.style.width = cssW + "px";
     this.canvas.style.height = cssH + "px";
@@ -110,14 +98,8 @@ export default class Game {
   }
 
   spawnEnemy() { this.enemies.push(new Enemy(this)); }
-  spawnObstacle() {
-    this.obstacles.push(new Obstacle(this));
-  }
-
-  scheduleNextSpawn() {
-    const base = 2000 - this.state.stage * 40; // ステージが上がるほど頻度UP
-    this.nextSpawn = Math.max(200, base + Math.random() * 500);
-  }
+  spawnObstacle() { this.obstacles.push(new Obstacle(this)); }
+  scheduleNextSpawn() { this.nextSpawn = 600 + Math.random() * 900; }
 
   autoShoot(now) {
     if (now - this.state.lastShot >= this.state.fireInterval) {
@@ -150,27 +132,51 @@ export default class Game {
     this.nextSpawn -= dt;
     if (this.nextSpawn <= 0) {
       const r = Math.random();
-
-      if (r < 0.3) {
-        // 敵の出現 30%
-        this.spawnEnemy();
-      } else {
-        // 障害物の出現 70%
-        this.spawnObstacle();
-      }
-
+      if (r < 0.7) this.spawnEnemy();
+      else this.spawnObstacle();
       this.scheduleNextSpawn();
     }
 
     // ▼ ステージ進行処理
+    s.stageTime += dt;
+
+    if (s.stageTime >= s.stageDuration) {
+      s.stageTime = 0;
+
+      if (s.stage < 10) {
+        s.stage++;
+
+        // ★ スクロールスピード上昇
+        s.scrollSpeed += 0.05;
+      }
+    }
 
     if (s.stageTime >= s.stageDuration) {
       s.stageTime = 0;
       if (s.stage < 10) {
         s.stage++;
-        s.scrollSpeed += 0.05;
       }
+      // console.log("Stage:", s.stage);
     }
+
+    // ▼ check obstacle platforms
+    game.obstacles.forEach((o) => {
+      const topY = o.y - this.h;
+
+      // 落下中で、かつプレイヤーが障害物の上に乗る条件
+      if (
+        this.vy > 0 &&
+        this.x + this.w > o.x &&
+        this.x < o.x + o.w &&
+        this.y <= topY &&
+        this.y + this.vy * dt >= topY
+      ) {
+        // 障害物の上に乗せる
+        this.y = topY;
+        this.vy = 0;
+        this.onGround = true;
+      }
+    });
 
     Utils.prune(this.bullets);
     Utils.prune(this.enemies);
@@ -178,63 +184,36 @@ export default class Game {
 
     document.getElementById("score").textContent = "Score: " + s.score;
     document.getElementById("lives").textContent = "Lives: " + s.lives;
-
-    document.getElementById("score").textContent = "Score: " + s.score;
-    document.getElementById("lives").textContent = "Lives: " + s.lives;
-
-    // ✅ ステージ進行処理（ここに入れる）
-    if (s.stageTime >= s.stageDuration) {
-      s.stageTime = 0;
-      if (s.stage < 10) {
-        s.stage++;
-        s.scrollSpeed += 0.05;  // ステージごとに速くなる
-      }
-    }
-
-    this.items.forEach((it) => it.update(dt, this));
-    Utils.prune(this.items);
-
   }
 
   handleCollisions() {
     const p = this.player;
-    const s = this.state;
 
-    // ---- bullet vs enemy ----
-    for (const b of this.bullets) {
-      if (!b.alive) continue;
-
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-
-        if (
-          b.x < e.x + e.w &&
-          b.x + 10 > e.x &&
-          b.y < e.y + e.h &&
-          b.y + 2 > e.y
-        ) {
+    // bullets vs enemies
+    this.bullets.forEach((b) => {
+      if (!b.alive) return;
+      this.enemies.forEach((e) => {
+        if (!e.alive) return;
+        if (b.x < e.x + e.w && b.x + 6 > e.x && b.y < e.y + e.h && b.y + 2 > e.y) {
           b.alive = false;
-          e.hp--;
-
+          e.hp -= 1;
           if (e.hp <= 0) {
             e.alive = false;
-            s.score += 10 * e.tier;
-
-            const types = ["speed", "barrier", "heal"];
-            const type = types[Math.floor(Math.random() * types.length)];
-
-            this.items.push(new Item(e.x, e.y, this, type));
+            this.state.score += 10 * e.tier;
           }
         }
-      }
-    }
+      });
+      // bullets vs obstacles (obstacle is indestructible)
+      this.obstacles.forEach((o) => {
+        if (b.alive && b.x < o.x + o.w && b.x + 6 > o.x && b.y < o.y + o.h && b.y + 2 > o.y) {
+          b.alive = false;
+        }
+      });
+    });
 
-    // ---- バリアをこのフレームで使ったか ----
-    let usedBarrier = false;
-
-    // --- enemy vs player ---
-    for (const e of this.enemies) {
-      if (!e.alive) continue;
+    // player vs enemies
+    this.enemies.forEach((e) => {
+      if (!e.alive) return;
 
       if (
         p.x < e.x + e.w &&
@@ -242,83 +221,35 @@ export default class Game {
         p.y < e.y + e.h &&
         p.y + p.h > e.y
       ) {
-        // ★ バリアがあればダメージを完全無効化して即返す
-        if (s.barrierActive) {
-          s.barrierActive = false; // バリア消費
-          e.alive = false;         // 触れた敵は消す
-          this.flash(200);
-          this.invul = 200;        // 連続当たり防止の短い無敵
-          return;                  // ← このフレームの残り衝突処理を打ち切る
-        }
-
-        // ★ バリアがないときだけ通常ダメージ
-        if (this.invul === 0) {
-          e.alive = false;
-          s.lives--;
+        if (this.invul === 0) { // ★ 連続ヒット防止
+          e.alive = false;      // 敵は消える（障害物は消さない）
+          s.lives -= 1;         // 1だけ減る
           this.flash(160);
-          this.invul = 400;
+          this.invul = 400;     // ★ 400ms 無敵
           if (s.lives <= 0) this.gameOver();
-          return;                  // このフレームの衝突処理は終わり
         }
       }
-    }
+    });
 
-    // --- obstacle vs player ---
-    for (const o of this.obstacles) {
+    // player vs obstacles
+    this.obstacles.forEach((o) => {
+      if (!o.alive) return;
+
       if (
         p.x < o.x + o.w &&
         p.x + p.w > o.x &&
         p.y < o.y + o.h &&
         p.y + p.h > o.y
       ) {
-        // ★ バリアがあればノーダメで消費して終了
-        if (s.barrierActive) {
-          s.barrierActive = false;
-          this.flash(200);
-          this.invul = 200;  // 連続ヒット防止
-          return;
-        }
-
-        // ★ バリアがないときだけ減る
-        if (this.invul === 0) {
-          s.lives--;
+        if (this.invul === 0) { // ★ 連続ヒット防止
+          s.lives -= 1;         // 1だけ減る
           this.flash(160);
-          this.invul = 400;
+          this.invul = 400;     // ★ 無敵時間
           if (s.lives <= 0) this.gameOver();
-          return;
         }
       }
-    }
-
-
-    // ---- item pickup ----
-    for (const it of this.items) {
-      if (!it.alive) continue;
-
-      if (
-        p.x < it.x + it.w &&
-        p.x + p.w > it.x &&
-        p.y < it.y + it.h &&
-        p.y + p.h > it.y
-      ) {
-        it.alive = false;
-
-        if (it.type === "speed") {
-          s.fireBoostActive = true;
-          s.fireInterval = s.fireIntervalBoost;
-        }
-
-        if (it.type === "barrier") {
-          s.barrierActive = true;    // ← バリアON（永続）
-        }
-
-        if (it.type === "heal") {
-          s.lives = Math.min(5, s.lives + 1);
-        }
-      }
-    }
+    });
   }
-
 
   flash(ms) { this.flashUntil = Math.max(this.flashUntil, this.state.time + ms); }
 
@@ -329,11 +260,10 @@ export default class Game {
     Renderer.drawPlayer(this);
 
     this.ctx.fillStyle = "#a8c7ff";
-    this.bullets.forEach((b) => this.ctx.fillRect(b.x, b.y, 15 * this.DPR, 4 * this.DPR));
+    this.bullets.forEach((b) => this.ctx.fillRect(b.x, b.y, 10 * this.DPR, 2 * this.DPR));
 
     this.enemies.forEach((e) => Renderer.drawEnemy(this, e));
     this.obstacles.forEach((o) => Renderer.drawObstacle(this, o));
-    this.items.forEach((it) => Renderer.drawItem(this, it));
 
     if (this.state.time < this.flashUntil) {
       this.ctx.fillStyle = "rgba(255,80,80,0.15)";
@@ -351,7 +281,6 @@ export default class Game {
     this.bullets.length = 0;
     this.enemies.length = 0;
     this.obstacles.length = 0;
-    this.items.length = 0;
 
     // reset game state
     this.state.score = 0;
@@ -359,40 +288,30 @@ export default class Game {
     this.state.time = 0;
     this.state.lastShot = 0;
 
-    // ★ 連射速度ブースト解除（これが重要）
-    this.state.fireBoostActive = false;
-    this.state.fireBoostTime = 0;
-    this.state.fireInterval = this.state.fireIntervalNormal;
-
-    // ★ バリア状態も解除しておく
-    this.state.barrierActive = false;
-    this.state.barrierTime = 0;
-
-    // stage reset
+    // ★ stage 初期化
     this.state.stage = 1;
     this.state.stageTime = 0;
-    this.state.scrollSpeed = 0.18;
+    this.state.scrollSpeed = 0.18;  // 初期値に戻す
 
-    // background
+    // reset background scroll
     this.bg.near = 0;
     this.bg.far = 0;
 
-    // spawn
+    // reset spawn timer
     this.nextSpawn = 800;
     this.scheduleNextSpawn();
 
-    // player
+    // reset player
     this.player.reset(this);
     this.invul = 0;
 
-    // flash
+    // reset flash
     this.flashUntil = 0;
 
-    // resume
+    // resume game
     this.state.running = true;
     document.getElementById("pauseBtn").textContent = "⏸ Pause";
   }
-
 
   gameOver() {
     this.state.running = false;
@@ -400,4 +319,3 @@ export default class Game {
     console.log("GAME OVER");
   }
 }
-

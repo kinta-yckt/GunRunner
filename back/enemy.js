@@ -8,21 +8,16 @@ export default class Enemy {
     // simple tier (1..3) for hp/size/speed variety
     const r = Math.random();
     this.tier = r < 0.6 ? 1 : (r < 0.9 ? 2 : 3);
-    this.hp = 1;
+    this.hp = this.tier;
 
     this.color = this.tier === 1 ? "#ff8b8b" : (this.tier === 2 ? "#ffd66b" : "#ffa64d");
 
-    this.w = 80 * game.DPR;  // 横長
-    this.h = 48 * game.DPR;  // 縦短（元画像の比率）
+    this.w = (22 + this.tier * 6);
+    this.h = (40 + this.tier * 8);
 
     // spawn at right edge on ground
     this.x = canvas.width + 40;
-    const baseY = game.canvas.height - game.state.groundH * game.DPR;
-    const minY = baseY - 500;  // 一番高い位置
-    const maxY = baseY - 150;   // 一番低い位置
-
-    this.y = minY + Math.random() * (maxY - minY);
-
+    this.y = canvas.height - state.groundH * DPR - this.h;
 
     // move speed
     this.speed = (0.12 + this.tier * 0.01) * DPR;

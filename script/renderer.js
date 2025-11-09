@@ -1,113 +1,275 @@
 export default class Renderer {
-  static drawBackground(game) {
-    const { ctx, canvas } = game;
+    static drawBackground(game) {
+        const { ctx, canvas, state } = game;
 
-    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    sky.addColorStop(0, "#00CED1");
-    sky.addColorStop(1, "#98FB98");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // ★ ステージ番号に応じたグラデーション取得
+        const colors = game.stageColors[state.stage - 1];
+        const topColor = colors[0];
+        const bottomColor = colors[1];
 
-    Renderer.drawHills(game, (-game.bg.far % canvas.width));
-    Renderer.drawHills(game, (-game.bg.far % canvas.width) + canvas.width);
-  }
+        const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        sky.addColorStop(0, topColor);
+        sky.addColorStop(1, bottomColor);
 
-  static drawHills(game, xOffset) {
-    const { ctx, canvas, state, DPR } = game;
-    const baseY = canvas.height - state.groundH * DPR - 220 * DPR;
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const w = canvas.width;
+        // 山の描画（そのまま）
+        const w = canvas.width;
+        const off = ((-game.bg.far % w) + w) % w;
+        Renderer.drawHills(game, off);
+        Renderer.drawHills(game, off - w);
+    }
 
-    ctx.fillStyle = "#182033";
-    ctx.beginPath();
-    ctx.moveTo(xOffset, canvas.height - state.groundH * DPR);
+    static drawHills(game, xOffset) {
+        const { ctx, canvas, state, DPR } = game;
+        const w = canvas.width;
+        const h = canvas.height;
 
-    ctx.bezierCurveTo(
-      xOffset + w * 0.15, baseY + 40,
-      xOffset + w * 0.25, baseY - 60,
-      xOffset + w * 0.4, baseY
-    );
+        const groundY = h - state.groundH * DPR;
+        const baseY = groundY - 350 * DPR;
 
-    ctx.bezierCurveTo(
-      xOffset + w * 0.55, baseY + 60,
-      xOffset + w * 0.7, baseY - 40,
-      xOffset + w * 0.85, baseY
-    );
+        ctx.fillStyle = "#014a4aff";
+        ctx.beginPath();
 
-    ctx.bezierCurveTo(
-      xOffset + w * 0.92, baseY + 20,
-      xOffset + w * 1.05, baseY - 30,
-      xOffset + w * 1.2, baseY
-    );
+        // 開始
+        ctx.moveTo(xOffset, groundY);
 
-    ctx.lineTo(xOffset + w * 1.2, canvas.height - state.groundH * DPR);
-    ctx.closePath();
-    ctx.fill();
-  }
+        // ★ ここで完全シームレスな山を生成する（sin波）
+        const amp = 30 * DPR;    // 山の高さ
+        const freq = (Math.PI * 2) / w; // 周期＝ちょうど w で繋がる
 
-  static drawGround(game) {
-    const { ctx, canvas, state, bg, DPR } = game;
+        for (let x = 0; x <= w; x += 8) {
+            // const y = baseY + Math.sin((x) * freq) * amp;
+            const y = baseY
+                + Math.sin(x * freq) * amp
+                + Math.sin(x * freq * 2) * (amp * 0.3);
+            ctx.lineTo(xOffset + x, y);
+        }
 
-    const y = canvas.height - state.groundH * DPR;
+        // 下まで閉じる
+        ctx.lineTo(xOffset + w, groundY);
+        ctx.lineTo(xOffset, groundY);
+        ctx.closePath();
+        ctx.fill();
+    }
 
-    ctx.fillStyle = "#0f1219";
-    ctx.fillRect(0, y, canvas.width, state.groundH * DPR);
+    static drawGround(game) {
+        const { ctx, canvas, state, DPR } = game;
 
-    const offset = bg.near % 40;
+        const y = canvas.height - state.groundH * DPR;
 
-    ctx.fillStyle = "#151a22";
-    for (let x = -offset; x < canvas.width; x += 40)
-      ctx.fillRect(x, y + 8 * DPR, 22, 6);
+        // ▼ 地面：真っ黒
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, y, canvas.width, state.groundH * DPR);
 
-    ctx.fillStyle = "#121620";
-    for (let x = -offset * 1.6; x < canvas.width; x += 64)
-      ctx.fillRect(x, y + 28 * DPR, 34, 6);
-  }
+        // ▼ 地面の境界線（白・棒人間と同じカラー）
+        ctx.strokeStyle = "#e8eaed";   // ←棒人間の線色と同じ
+        ctx.lineWidth = 2 * DPR;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
 
-  static drawPlayer(game) {
-    const { ctx, state, DPR } = game;
-    const p = game.player;
+    static drawPlayer(game) {
+        const { ctx, state, DPR } = game;
+        const p = game.player;
 
-    ctx.strokeStyle = "#e8eaed";
-    ctx.lineWidth = Math.max(2, 2 * DPR);
+        // ★ バリア中ならオーラを描く（先に後ろに描く）
+        if (state.barrierActive) {
+            const radius = p.w * 1.2;   // オーラの大きさ（調整可）
+            const centerX = p.x + p.w / 2;
+            const centerY = p.y + p.h / 2;
 
-    const headR = Math.floor(p.w * 0.45);
+            const grd = ctx.createRadialGradient(
+                centerX, centerY, radius * 0.2,
+                centerX, centerY, radius
+            );
 
-    ctx.beginPath();
-    ctx.arc(p.x + p.w / 2, p.y + headR + 2, headR, 0, Math.PI * 2);
-    ctx.stroke();
+            grd.addColorStop(0, "rgba(120, 220, 255, 0.55)");  // 中心明るく
+            grd.addColorStop(1, "rgba(120, 220, 255, 0.0)");   // 外へ消える
 
-    const neckY = p.y + headR * 2 + 6;
-    const hipY = p.y + p.h - 10;
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
-    ctx.beginPath();
-    ctx.moveTo(p.x + p.w / 2, neckY);
-    ctx.lineTo(p.x + p.w / 2, hipY);
-    ctx.stroke();
+        ctx.strokeStyle = "#e8eaed";
+        ctx.lineWidth = Math.max(2, 2 * DPR);
 
-    ctx.beginPath();
-    ctx.moveTo(p.x + p.w / 2, neckY + 8);
-    ctx.lineTo(p.x + p.w + 10 * DPR, neckY + 2);
-    ctx.stroke();
+        const headR = Math.floor(p.w * 0.3);
 
-    const stride = Math.sin(state.time / 160) * 8 * DPR;
+        ctx.beginPath();
+        ctx.arc(p.x + p.w / 2, p.y + headR + 4, headR, 0, Math.PI * 2);
+        ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(p.x + p.w / 2, hipY);
-    ctx.lineTo(p.x + 3 + stride, p.y + p.h);
-    ctx.moveTo(p.x + p.w / 2, hipY);
-    ctx.lineTo(p.x - 6 - stride, p.y + p.h);
-    ctx.stroke();
-  }
+        const neckY = p.y + headR * 2 + 6;
+        const hipY = p.y + p.h - 30;
 
-  static drawEnemy(game, e) {
-    const { ctx } = game;
+        ctx.beginPath();
+        ctx.moveTo(p.x + p.w / 2, neckY);
+        ctx.lineTo(p.x + p.w / 2, hipY);
+        ctx.stroke();
 
-    ctx.fillStyle = e.color;
-    ctx.fillRect(e.x, e.y, e.w, e.h);
+        ctx.beginPath();
+        ctx.moveTo(p.x + p.w / 2, neckY + 8);
+        ctx.lineTo(p.x + p.w + 10 * DPR, neckY + 2);
+        ctx.stroke();
 
-    ctx.fillStyle = "rgba(0,0,0,.35)";
-    for (let i = 0; i < e.hp; i++)
-      ctx.fillRect(e.x + 3 + i * 6, e.y + 3, 4, 3);
-  }
+        // --- 脚（左右対称の自然な走りアニメ） ---
+        const stride = Math.sin(state.time / 140) * 10 * DPR;
+
+        // 足の付け根
+        const hipX = p.x + p.w / 2;
+        const hipY_local = hipY;
+
+        // 基本角度と足の長さ
+        const legLengthX = 10;  // 前後の開き量（左右共通）
+        const legLengthY = p.y + p.h - hipY_local;  // 足先の高さ距離（左右共通）
+
+        // === 前足（右足） ===
+        ctx.beginPath();
+        ctx.moveTo(hipX, hipY_local);
+        ctx.lineTo(
+            hipX + legLengthX + stride,
+            hipY_local + legLengthY
+        );
+        ctx.stroke();
+
+        // === 後足（左足） ===
+        ctx.beginPath();
+        ctx.moveTo(hipX, hipY_local);
+        ctx.lineTo(
+            hipX - legLengthX - stride,
+            hipY_local + legLengthY
+        );
+        ctx.stroke();
+    }
+
+    static drawEnemy(game, e) {
+        const ctx = game.ctx;
+        const x = e.x;
+        const y = e.y;
+        const w = e.w;
+        const h = e.h;
+
+        ctx.save();
+        ctx.strokeStyle = "#ffffff";       // 棒人間と同じ色
+        ctx.lineWidth = 5 * game.DPR;    // 棒人間と近い太さ
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+
+        ctx.beginPath();
+
+        // === 胴体（横棒） ===
+        ctx.moveTo(x + w * 0.8, y + h * 0.5);
+        ctx.lineTo(x + w * 0.5, y + h * 0.5);
+
+        // === 主翼（上） ===
+        ctx.moveTo(x + w * 0.6, y + h * 0.5);
+        ctx.lineTo(x + w * 0.75, y + h * 0.25);
+
+        // === 主翼（下） ===
+        ctx.moveTo(x + w * 0.6, y + h * 0.5);
+        ctx.lineTo(x + w * 0.75, y + h * 0.75);
+
+        // === 尾翼（上） ===
+        ctx.moveTo(x + w * 0.85, y + h * 0.5);
+        ctx.lineTo(x + w * 0.92, y + h * 0.35);
+
+        // === 尾翼（下） ===
+        ctx.moveTo(x + w * 0.85, y + h * 0.5);
+        ctx.lineTo(x + w * 0.92, y + h * 0.65);
+
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    static drawObstacle(game, o) {
+        const { ctx } = game;
+
+        const x = Math.round(o.x);
+        const y = Math.round(o.y);
+        const w = Math.round(o.w);
+        const h = Math.round(o.h);
+
+        ctx.fillStyle = "#000";
+        ctx.fillRect(x, y, w, h);
+
+        ctx.strokeStyle = "#e8eaed"; // 白い縁
+        ctx.lineWidth = 2 * game.DPR;
+        ctx.strokeRect(x, y, w, h);
+    }
+
+    static drawItem(game, item) {
+        const ctx = game.ctx;
+        const x = item.x;
+        const y = item.y;
+        const w = item.w;
+        const h = item.h;
+
+        ctx.lineWidth = 2 * game.DPR;
+        ctx.strokeStyle = "#ffffff";
+
+        // ======== 1) 連射速度アップ：弾薬（bullet） ========
+        if (item.type === "speed") {
+            ctx.fillStyle = "#ffae00"; // 弾の色（オレンジ）
+
+            ctx.beginPath();
+            // 左側：丸い先端
+            ctx.arc(x + w * 0.3, y + h * 0.5, w * 0.3, Math.PI / 2, -Math.PI / 2, true);
+            // 右側：後部ケース
+            ctx.lineTo(x + w * 0.9, y + h * 0.2);
+            ctx.arc(x + w * 0.9, y + h * 0.5, w * 0.3, -Math.PI / 2, Math.PI / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            return;
+        }
+
+        // ======== 2) バリア（Barrier） ========
+        if (item.type === "barrier") {
+            ctx.fillStyle = "rgba(100, 200, 255, 0.35)"; // 半透明ブルー
+
+            ctx.beginPath();
+            ctx.arc(x + w / 2, y + h / 2, w * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            return;
+        }
+
+        // ======== 3) 回復：薬（capsule） ========
+        if (item.type === "heal") {
+            const mid = y + h * 0.5;
+
+            // 上半分（赤）
+            ctx.fillStyle = "#ff5c5c";
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.2, mid);
+            ctx.lineTo(x + w * 0.2, y + h * 0.3);
+            ctx.arc(x + w * 0.5, y + h * 0.3, w * 0.3, Math.PI, 0);
+            ctx.lineTo(x + w * 0.8, mid);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 下半分（白）
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.2, mid);
+            ctx.lineTo(x + w * 0.2, y + h * 0.7);
+            ctx.arc(x + w * 0.5, y + h * 0.7, w * 0.3, Math.PI, 0, true);
+            ctx.lineTo(x + w * 0.8, mid);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            return;
+        }
+    }
+
+
+
 }

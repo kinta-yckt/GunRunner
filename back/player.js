@@ -1,19 +1,19 @@
 export default class Player {
     constructor(game) {
-        this.w = 50;
-        this.h = 100;
-        this.x = 100;
+        this.w = 26;
+        this.h = 64;
+        this.x = 120;
         this.y = 0;
         this.vy = 0;
 
-        this.jumpVel = -0.4; // ← 最大ジャンプ高さはこれで決まる
+        this.jumpVel = -0.3; // ← 最大ジャンプ高さはこれで決まる
         this.onGround = false;
         this.coyote = 0;
 
         // ▼ 可変ジャンプ追加
         this.jumpHolding = false;     // 押しっぱなし中か？
         this.jumpHoldTime = 0;        // 押した時間
-        this.jumpHoldMax = 400;       // 最大何msまで上昇補助する？
+        this.jumpHoldMax = 300;       // 最大何msまで上昇補助する？
 
         this.reset(game);
     }
@@ -61,34 +61,19 @@ export default class Player {
         this.vy += g.state.gravity * dt * g.DPR;
         this.y += this.vy * dt;
 
-        // ▼ 障害物の上に乗る処理
-        game.obstacles.forEach((o) => {
-            const topY = o.y - this.h;
-
-            if (
-                this.vy > 0 &&
-                this.x + this.w > o.x &&
-                this.x < o.x + o.w &&
-                this.y <= topY &&
-                this.y + this.vy * dt >= topY
-            ) {
-                this.y = topY;
-                this.vy = 0;
-                this.onGround = true;
-
-                this.jumpHolding = false;
-                this.jumpHoldTime = 0;
-            }
-        });
-
-        // ▼ 地面との接触処理
-        const groundY = game.canvas.height - game.state.groundH * game.DPR - this.h;
+        // ▼ 着地
+        const groundY = g.canvas.height - g.state.groundH * g.DPR - this.h;
 
         if (this.y >= groundY) {
             this.y = groundY;
             this.vy = 0;
-            if (!this.onGround) this.coyote = game.state.time;
+
+            if (!this.onGround) this.coyote = g.state.time;
             this.onGround = true;
+
+            // 着地でホールド終了
+            this.jumpHolding = false;
+            this.jumpHoldTime = 0;
         }
     }
 }
