@@ -113,6 +113,31 @@ export default class Game {
       .addEventListener("click", () => this.togglePause());
     document.getElementById("restartBtn")
       .addEventListener("click", () => this.restart());
+
+    //----------------------------------
+    // ボタンフォーカス制御（左右キー）
+    //----------------------------------
+    const pauseBtn = document.getElementById("pauseBtn");
+    const restartBtn = document.getElementById("restartBtn");
+
+    // ★ ゲーム開始時に Pause をフォーカス
+    pauseBtn.focus();
+
+    // 現在どちらのボタンにいるか管理
+    let focusIndex = 0;  // 0 = pause, 1 = restart
+
+    window.addEventListener("keydown", (e) => {
+      // 左右キーのみ反応
+      if (e.code === "ArrowRight") {
+        focusIndex = 1;
+        restartBtn.focus();
+      }
+      if (e.code === "ArrowLeft") {
+        focusIndex = 0;
+        pauseBtn.focus();
+      }
+    });
+
   }
 
   spawnEnemy() { this.enemies.push(new Enemy(this)); }
@@ -363,6 +388,27 @@ export default class Game {
       this.ctx.fillStyle = "rgba(255,80,80,0.15)";
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
+
+    // ▼ ★★★★★ GAME OVER 表示（ここから追加） ★★★★★
+    if (!this.state.running && this.state.lives <= 0) {
+
+      const ctx = this.ctx;
+      const w = this.canvas.width;
+      const h = this.canvas.height;
+
+      // 背景に薄く黒を敷く
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillRect(0, 0, w, h);
+
+      // 文字スタイル
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `${40 * this.DPR}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      ctx.fillText("GAME OVER", w / 2, h / 2);
+    }
+    // ★★★★★ 追加ここまで ★★★★★
   }
 
   togglePause() {
@@ -420,11 +466,16 @@ export default class Game {
     this.obstacleSpawnTimer = 600;
   }
 
-
   gameOver() {
     this.state.running = false;
     document.getElementById("pauseBtn").textContent = "▶ Resume";
+
+    // ★ Restart にフォーカスを移す
+    const restartBtn = document.getElementById("restartBtn");
+    restartBtn.focus();
+
     console.log("GAME OVER");
   }
+
 }
 
