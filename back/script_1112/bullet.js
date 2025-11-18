@@ -1,8 +1,13 @@
+// ======================================================
+// bullet.js
+// 弾（単純な矩形）
+// ======================================================
+
 export default class Bullet {
   constructor(x, y, game) {
     this.x = x;
     this.y = y;
-    this.vx = 0.2 * game.DPR;
+    this.vx = 0.65 * game.DPR;  // 弾速
     this.alive = true;
   }
 

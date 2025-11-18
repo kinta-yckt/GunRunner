@@ -10,4 +10,6 @@ export default class Bullet {
     this.x += this.vx * dt;
     if (this.x > game.canvas.width + 50) this.alive = false;
   }
+
+
 }

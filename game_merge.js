@@ -4,9 +4,7 @@ import Enemy from "./enemy.js";
 import Renderer from "./renderer.js";
 import Utils from "./utils.js";
 import Obstacle from "./obstacle.js";
-
-import Input from "./input.js";
-import Collision from "./collision.js";
+import Item from "./item.js";
 
 export default class Game {
   constructor() {
@@ -71,9 +69,9 @@ export default class Game {
     ];
 
     this.items = [];
-    this.collision = new Collision(this);
-    this.input = new Input(this);
-    this.input.init();
+
+    this.initInput();
+
   }
 
   resizeCanvas() {
@@ -84,6 +82,62 @@ export default class Game {
     this.canvas.style.height = cssH + "px";
     this.canvas.width = Math.floor(cssW * this.DPR);
     this.canvas.height = Math.floor(cssH * this.DPR);
+  }
+
+  initInput() {
+    this.jumpKeyDown = false;
+
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (["ArrowUp", "Space", "KeyW"].includes(e.code)) {
+          e.preventDefault();
+          if (!this.jumpKeyDown) {
+            this.jumpKeyDown = true;
+            this.player.tryJump(this.state);
+          }
+        }
+        if (e.code === "KeyP") this.togglePause();
+      },
+      { passive: false }
+    );
+
+    window.addEventListener("keyup", (e) => {
+      if (["ArrowUp", "Space", "KeyW"].includes(e.code)) {
+        this.jumpKeyDown = false;
+        this.player.jumpHolding = false;
+      }
+    });
+
+    document.getElementById("pauseBtn")
+      .addEventListener("click", () => this.togglePause());
+    document.getElementById("restartBtn")
+      .addEventListener("click", () => this.restart());
+
+    //----------------------------------
+    // ボタンフォーカス制御（左右キー）
+    //----------------------------------
+    const pauseBtn = document.getElementById("pauseBtn");
+    const restartBtn = document.getElementById("restartBtn");
+
+    // ★ ゲーム開始時に Pause をフォーカス
+    pauseBtn.focus();
+
+    // 現在どちらのボタンにいるか管理
+    let focusIndex = 0;  // 0 = pause, 1 = restart
+
+    window.addEventListener("keydown", (e) => {
+      // 左右キーのみ反応
+      if (e.code === "ArrowRight") {
+        focusIndex = 1;
+        restartBtn.focus();
+      }
+      if (e.code === "ArrowLeft") {
+        focusIndex = 0;
+        pauseBtn.focus();
+      }
+    });
+
   }
 
   spawnEnemy() { this.enemies.push(new Enemy(this)); }
@@ -110,11 +164,9 @@ export default class Game {
     s.time += dt;
     s.stageTime += dt;
 
-    // 背景スクロール
     this.bg.near += s.scrollSpeed * dt * this.DPR;
-    this.bg.far += s.scrollSpeed * dt * this.DPR;
+    this.bg.far += s.scrollSpeed * 0.4 * dt * this.DPR;
 
-    // プレイヤー・敵・弾など更新
     this.player.update(dt, this);
     this.autoShoot(s.time);
     if (this.invul > 0) this.invul = Math.max(0, this.invul - dt);
@@ -122,12 +174,8 @@ export default class Game {
     this.bullets.forEach((b) => b.update(dt, this));
     this.enemies.forEach((e) => e.update(dt, this));
     this.obstacles.forEach((o) => o.update(dt, this));
-    this.items.forEach((it) => it.update(dt, this));
 
-    // 状態・当たり判定
-
-
-    this.collision.handleCollisions(this);
+    this.handleCollisions();
 
     // -----------------------------
     // 敵スポーン（独立）
@@ -173,18 +221,152 @@ export default class Game {
       }
     }
 
-    // 画面外削除
     Utils.prune(this.bullets);
     Utils.prune(this.enemies);
     Utils.prune(this.obstacles);
-    Utils.prune(this.items);
 
-    // UI更新
     document.getElementById("score").textContent = "Score: " + s.score;
     document.getElementById("lives").textContent = "Lives: " + s.lives;
+
+    document.getElementById("score").textContent = "Score: " + s.score;
+    document.getElementById("lives").textContent = "Lives: " + s.lives;
+
+    this.items.forEach((it) => it.update(dt, this));
+    Utils.prune(this.items);
+
   }
 
+  handleCollisions() {
+    const p = this.player;
+    const s = this.state;
 
+    // ---- bullet vs enemy ----
+    // bullet vs enemy
+    this.bullets.forEach((b) => {
+      if (!b.alive) return;
+
+      this.enemies.forEach((e) => {
+        if (!e.alive) return;
+
+        if (
+          b.x < e.x + e.w &&
+          b.x + 10 > e.x &&
+          b.y < e.y + e.h &&
+          b.y + 2 > e.y
+        ) {
+          b.alive = false;
+
+          // ★ バリア持ちの場合（ステージ3〜）
+          if (e.hasBarrier && e.hp === 2) {
+            e.hp = 1;          // バリアが割れる
+            e.hasBarrier = false;
+            return;            // まだ死なない
+          }
+
+          // ★ 通常処理（HP 0 → 死亡）
+          e.hp -= 1;
+          if (e.hp <= 0) {
+            e.alive = false;
+            s.score += 10 * e.tier;
+
+            const types = ["speed", "barrier", "heal"];
+            const type = types[Math.floor(Math.random() * types.length)];
+            this.items.push(new Item(e.x, e.y, this, type));
+          }
+        }
+      });
+    });
+
+
+    // ---- バリアをこのフレームで使ったか ----
+    let usedBarrier = false;
+
+    // --- enemy vs player ---
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+
+      if (
+        p.x < e.x + e.w &&
+        p.x + p.w > e.x &&
+        p.y < e.y + e.h &&
+        p.y + p.h > e.y
+      ) {
+        // ★ バリアがあればダメージを完全無効化して即返す
+        if (s.barrierActive) {
+          s.barrierActive = false; // バリア消費
+          e.alive = false;         // 触れた敵は消す
+          this.flash(200);
+          this.invul = 200;        // 連続当たり防止の短い無敵
+          return;                  // ← このフレームの残り衝突処理を打ち切る
+        }
+
+        // ★ バリアがないときだけ通常ダメージ
+        if (this.invul === 0) {
+          e.alive = false;
+          s.lives--;
+          this.flash(160);
+          this.invul = 400;
+          if (s.lives <= 0) this.gameOver();
+          return;                  // このフレームの衝突処理は終わり
+        }
+      }
+    }
+
+    // --- obstacle vs player ---
+    for (const o of this.obstacles) {
+      if (
+        p.x < o.x + o.w &&
+        p.x + p.w > o.x &&
+        p.y < o.y + o.h &&
+        p.y + p.h > o.y
+      ) {
+        // ★ バリアがあればノーダメで消費して終了
+        if (s.barrierActive) {
+          s.barrierActive = false;
+          this.flash(200);
+          this.invul = 200;  // 連続ヒット防止
+          return;
+        }
+
+        // ★ バリアがないときだけ減る
+        if (this.invul === 0) {
+          s.lives--;
+          this.flash(160);
+          this.invul = 400;
+          if (s.lives <= 0) this.gameOver();
+          return;
+        }
+      }
+    }
+
+
+    // ---- item pickup ----
+    for (const it of this.items) {
+      if (!it.alive) continue;
+
+      if (
+        p.x < it.x + it.w &&
+        p.x + p.w > it.x &&
+        p.y < it.y + it.h &&
+        p.y + p.h > it.y
+      ) {
+        it.alive = false;
+
+        if (it.type === "speed") {
+          s.fireBoostActive = true;
+          s.fireInterval = s.fireIntervalBoost;
+        }
+
+        if (it.type === "barrier") {
+          s.barrierActive = true;    // ← バリアON（永続）
+        }
+
+        if (it.type === "heal") {
+          s.lives = Math.min(5, s.lives + 1);
+        }
+      }
+    }
+  }
 
 
   flash(ms) { this.flashUntil = Math.max(this.flashUntil, this.state.time + ms); }
