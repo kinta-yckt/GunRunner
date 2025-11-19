@@ -41,11 +41,12 @@ export default class Game {
     this.enemySpawnTimer = 1000;
     this.obstacleSpawnTimer = 600;
 
-    this.player = new Player(this);
     this.invul = 0;
     this.bullets = [];
     this.enemies = [];
     this.obstacles = [];
+    this.items = [];
+
     this.enemySpawnTime = 0;
     this.enemySpawnInterval = 1500;
     this.obstacleSpawnTime = 0;
@@ -70,7 +71,7 @@ export default class Game {
       ["#541003ff", "#FFA840"],
     ];
 
-    this.items = [];
+    this.player = new Player(this);
     this.collision = new Collision(this);
     this.input = new Input(this);
     this.input.init();
@@ -86,55 +87,49 @@ export default class Game {
     this.canvas.height = Math.floor(cssH * this.DPR);
   }
 
-  spawnEnemy() { this.enemies.push(new Enemy(this)); }
-  spawnObstacle(air = false) {
-    this.obstacles.push(new Obstacle(this, { air }));
-  }
-
   scheduleNextSpawn() {
     const base = 2000 - this.state.stage * 40; // ステージが上がるほど頻度UP
     this.nextSpawn = Math.max(200, base + Math.random() * 500);
-  }
-
-  autoShoot(now) {
-    if (now - this.state.lastShot >= this.state.fireInterval) {
-      this.state.lastShot = now;
-      const x = this.player.x + this.player.w + 10 * this.DPR;
-      const y = this.player.y + this.player.h * 0.35;
-      this.bullets.push(new Bullet(x, y, this));
-    }
   }
 
   update(dt) {
     const s = this.state;
     s.time += dt;
     s.stageTime += dt;
+    if (this.invul > 0) {
+      this.invul = Math.max(0, this.invul - dt);
+    }
 
     // 背景スクロール
     this.bg.near += s.scrollSpeed * dt * this.DPR;
     this.bg.far += s.scrollSpeed * dt * this.DPR;
 
-    // プレイヤー・敵・弾など更新
+    // プレイヤー・敵更新
     this.player.update(dt, this);
-    this.autoShoot(s.time);
-    if (this.invul > 0) this.invul = Math.max(0, this.invul - dt);
-
     this.bullets.forEach((b) => b.update(dt, this));
     this.enemies.forEach((e) => e.update(dt, this));
     this.obstacles.forEach((o) => o.update(dt, this));
     this.items.forEach((it) => it.update(dt, this));
 
     // 状態・当たり判定
-
-
     this.collision.handleCollisions(this);
+
+    // -----------------------------
+    // 銃弾
+    // -----------------------------
+    if (s.time - this.state.lastShot >= this.state.fireInterval) {
+      this.state.lastShot = s.time;
+      const x = this.player.x + this.player.w + 10 * this.DPR;
+      const y = this.player.y + this.player.h * 0.35;
+      this.bullets.push(new Bullet(x, y, this));
+    }
 
     // -----------------------------
     // 敵スポーン（独立）
     // -----------------------------
     this.enemySpawnTimer -= dt;
     if (this.enemySpawnTimer <= 0) {
-      this.spawnEnemy();
+      this.enemies.push(new Enemy(this));
 
       // 次の敵スポーン（ステージで加速）
       this.enemySpawnTimer =
@@ -153,7 +148,7 @@ export default class Game {
       const makeAir =
         this.state.stage >= 2 && Math.random() < 0.5;
 
-      this.spawnObstacle(makeAir);
+      this.obstacles.push(new Obstacle(this, { makeAir }));
 
       // 次の障害物スポーン（ステージで加速）
       this.obstacleSpawnTimer =
@@ -162,7 +157,6 @@ export default class Game {
       if (this.obstacleSpawnTimer < 200)
         this.obstacleSpawnTimer = 200;
     }
-
 
     // ▼ ステージ進行処理
     if (s.stageTime >= s.stageDuration) {
@@ -184,10 +178,9 @@ export default class Game {
     document.getElementById("lives").textContent = "Lives: " + s.lives;
   }
 
-
-
-
-  flash(ms) { this.flashUntil = Math.max(this.flashUntil, this.state.time + ms); }
+  flash(ms) {
+    this.flashUntil = Math.max(this.flashUntil, this.state.time + ms);
+  }
 
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
