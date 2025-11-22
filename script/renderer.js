@@ -194,6 +194,33 @@ export default class Renderer {
 
         ctx.stroke();
         ctx.restore();
+
+        // ★ バリアがアクティブなら輪郭を強調して描く（縁取り＋オーラ）
+        if (e.hasBarrier) {
+            const ctx = game.ctx;
+
+            const cx = e.x + e.w / 1.4;
+            const cy = e.y + e.h / 1.9;
+            const radius = Math.max(e.w, e.h) * 0.3;
+
+            ctx.save();
+
+            // === ① 外側のクッキリ縁取り ===
+            ctx.strokeStyle = "#00ffff";           // くっきりシアン
+            ctx.lineWidth = 3 * game.DPR;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // === ② 内側の淡い光（オーラ） ===
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.35)";  // 半透明シアン
+            ctx.lineWidth = 7 * game.DPR;                // 太めのぼかし線
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius - 15, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
     }
 
     static drawObstacle(game, o) {

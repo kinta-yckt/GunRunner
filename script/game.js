@@ -4,7 +4,7 @@ import Enemy from "./enemy.js";
 import Renderer from "./renderer.js";
 import Utils from "./utils.js";
 import Obstacle from "./obstacle.js";
-
+import Config from "./config.js";
 import Input from "./input.js";
 import Collision from "./collision.js";
 
@@ -21,42 +21,54 @@ export default class Game {
       running: true,
       time: 0,
       lastShot: 0,
-      fireInterval: 800,
       score: 0,
       lives: 3,
-      gravity: 0.0025,
-      groundH: 90,
-      scrollSpeed: 0.18,
       stage: 1,
       stageTime: 0,
-      stageDuration: 40000,
+      scrollSpeed: 0,
+      gravity: 0.0025,
       fireBoostActive: false,
       fireBoostTime: 0,
-      fireIntervalNormal: 800,
-      fireIntervalBoost: 300,
-
+      fireInterval: 800,
+      fireIntervalLevel: 1,
       barrierActive: false,
       barrierTime: 0,
+
+      groundH: 90,
+      enemySpawnTime: 0,
+      enemySpawnTimer: 1000,
+      enemySpawnBaseTimeFrom: 0,
+      enemySpawnBaseTimeTo: 0,
+
+      obstacleSpawnTimer: 600,
+      obstacleSpawnBaseTimeFrom: 0,
+      obstacleSpawnBaseTimeTo: 0,
+      obstacleSpawnTime: 0,
+      obstacleSpawnInterval: 900,
+      bgObstacle: 0,
+
+      nextSpawn: 800,
+
+      invul: 0,
+      flashUntil: 0,
+      enemySpawnInterval: 1500,
+
+      obstacleAirRate: 0.0,
+      enemyBarrierRate: 0.0,
+
     };
-    this.enemySpawnTimer = 1000;
-    this.obstacleSpawnTimer = 600;
 
-    this.invul = 0;
-    this.bullets = [];
-    this.enemies = [];
-    this.obstacles = [];
-    this.items = [];
+    this.config = {
+      stageDuration: 30000,
+      fireIntervalNormal: 1000,
+      fireIntervalBoost: 500,
+      fireIntervalBoostBoost: 200,
+    };
 
-    this.enemySpawnTime = 0;
-    this.enemySpawnInterval = 1500;
-    this.obstacleSpawnTime = 0;
-    this.obstacleSpawnInterval = 900;
-    this.bgObstacle = 0;
-
-    this.bg = { near: 0, far: 0 };
-
-    this.nextSpawn = 800;
-    this.flashUntil = 0;
+    this.bg = {
+      near: 0,
+      far: 0
+    };
 
     this.stageColors = [
       ["#87CEFA", "#98FB98"],
@@ -71,10 +83,14 @@ export default class Game {
       ["#541003ff", "#FFA840"],
     ];
 
+    this.bullets = [];
+    this.enemies = [];
+    this.obstacles = [];
+    this.items = [];
     this.player = new Player(this);
     this.collision = new Collision(this);
     this.input = new Input(this);
-    this.input.init();
+    Config.setStageParams(this);
   }
 
   resizeCanvas() {
@@ -94,8 +110,19 @@ export default class Game {
 
   update(dt) {
     const s = this.state;
+    const c = this.config;
     s.time += dt;
     s.stageTime += dt;
+
+    // ▼ ステージ進行処理
+    if (s.stageTime >= c.stageDuration) {
+      s.stageTime = 0;
+      if (s.stage < 10) {
+        s.stage++;
+        Config.setStageParams(this);
+      }
+    }
+
     if (this.invul > 0) {
       this.invul = Math.max(0, this.invul - dt);
     }
@@ -117,8 +144,15 @@ export default class Game {
     // -----------------------------
     // 銃弾
     // -----------------------------
-    if (s.time - this.state.lastShot >= this.state.fireInterval) {
-      this.state.lastShot = s.time;
+    if (s.fireIntervalLevel == 3) {
+      s.fireInterval = c.fireIntervalBoostBoost;
+    } else if (s.fireIntervalLevel == 2) {
+      s.fireInterval = c.fireIntervalBoost;
+    } else if (s.fireIntervalLevel == 1) {
+      s.fireInterval = c.fireIntervalNormal;
+    }
+    if (s.time - s.lastShot >= s.fireInterval) {
+      s.lastShot = s.time;
       const x = this.player.x + this.player.w + 10 * this.DPR;
       const y = this.player.y + this.player.h * 0.35;
       this.bullets.push(new Bullet(x, y, this));
@@ -127,44 +161,23 @@ export default class Game {
     // -----------------------------
     // 敵スポーン（独立）
     // -----------------------------
-    this.enemySpawnTimer -= dt;
-    if (this.enemySpawnTimer <= 0) {
+    s.enemySpawnTimer -= dt;
+    if (s.enemySpawnTimer <= 0) {
       this.enemies.push(new Enemy(this));
 
       // 次の敵スポーン（ステージで加速）
-      this.enemySpawnTimer =
-        2000 - this.state.stage * 25 + Math.random() * 200;
-
-      if (this.enemySpawnTimer < 300) this.enemySpawnTimer = 300;
+      s.enemySpawnTimer = Utils.randomRange(s.enemySpawnBaseTimeFrom, s.enemySpawnBaseTimeTo);
     }
 
     // -----------------------------
     // 障害物スポーン（独立）
     // -----------------------------
-    this.obstacleSpawnTimer -= dt;
-    if (this.obstacleSpawnTimer <= 0) {
-
-      // ステージ2から空中障害物出現
-      const makeAir =
-        this.state.stage >= 2 && Math.random() < 0.5;
-
-      this.obstacles.push(new Obstacle(this, { makeAir }));
+    s.obstacleSpawnTimer -= dt;
+    if (s.obstacleSpawnTimer <= 0) {
+      this.obstacles.push(new Obstacle(this));
 
       // 次の障害物スポーン（ステージで加速）
-      this.obstacleSpawnTimer =
-        3000 - this.state.stage * 20 + Math.random() * 150;
-
-      if (this.obstacleSpawnTimer < 200)
-        this.obstacleSpawnTimer = 200;
-    }
-
-    // ▼ ステージ進行処理
-    if (s.stageTime >= s.stageDuration) {
-      s.stageTime = 0;
-      if (s.stage < 10) {
-        s.stage++;
-        s.scrollSpeed += 0.05;
-      }
+      s.obstacleSpawnTimer = Utils.randomRange(s.obstacleSpawnBaseTimeFrom, s.obstacleSpawnBaseTimeTo);
     }
 
     // 画面外削除
@@ -243,7 +256,7 @@ export default class Game {
     // ★ 連射速度ブースト解除（これが重要）
     this.state.fireBoostActive = false;
     this.state.fireBoostTime = 0;
-    this.state.fireInterval = this.state.fireIntervalNormal;
+    this.state.fireIntervalLevel = 1;
 
     // ★ バリア状態も解除しておく
     this.state.barrierActive = false;
@@ -252,7 +265,7 @@ export default class Game {
     // stage reset
     this.state.stage = 1;
     this.state.stageTime = 0;
-    this.state.scrollSpeed = 0.18;
+    Config.setStageParams(this);
 
     // background
     this.bg.near = 0;
@@ -272,6 +285,7 @@ export default class Game {
     // resume
     this.state.running = true;
     document.getElementById("pauseBtn").textContent = "⏸ Pause";
+    document.getElementById("pauseBtn").style.display = "block";
 
     this.enemySpawnTimer = 1000;
     this.obstacleSpawnTimer = 600;
@@ -284,6 +298,9 @@ export default class Game {
     // ★ Restart にフォーカスを移す
     const restartBtn = document.getElementById("restartBtn");
     restartBtn.focus();
+
+    // ゲームオーバーで非表示
+    document.getElementById("pauseBtn").style.display = "none";
 
     console.log("GAME OVER");
   }

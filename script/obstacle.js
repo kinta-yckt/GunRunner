@@ -1,12 +1,14 @@
 // obstacle.js
 export default class Obstacle {
-  constructor(game, opts = {}) {
+  constructor(game) {
     const { canvas, state, DPR } = game;
     this.type = "obstacle";
     this.alive = true;
 
     // ← 追加: 空中(air)か地上かを指定
-    this.air = !!opts.air;
+    if (Math.random() < game.state.obstacleAirRate) {
+      this.air = true;
+    }
 
     // サイズ（そのまま/お好みで調整可）
     this.w = 20 * DPR;
@@ -18,7 +20,7 @@ export default class Obstacle {
     // ↓ 地上 or 空中の Y を切り替え
     if (this.air) {
       const groundY = canvas.height - state.groundH * DPR;
-      const minY = groundY - 200 * DPR; // 高い
+      const minY = groundY - 300 * DPR; // 高い
       const maxY = groundY - 90 * DPR; // 低い（地面より上）
       this.y = minY + Math.random() * (maxY - minY);
     } else {

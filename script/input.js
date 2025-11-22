@@ -3,8 +3,7 @@ export default class Input {
     constructor(game) {
         this.game = game;
         this.jumpKeyDown = false;
-    }
-    init() {
+
 
         window.addEventListener(
             "keydown",
@@ -56,8 +55,8 @@ export default class Input {
                 pauseBtn.focus();
             }
         });
-
     }
+
 
 
 

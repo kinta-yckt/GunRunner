@@ -8,6 +8,71 @@ import { CONFIG } from "./config.js";
 export default class GameState {
     constructor() {
         this.reset();
+
+        this.state = {
+            running: true,
+            time: 0,
+            lastShot: 0,
+            fireInterval: 800,
+            score: 0,
+            lives: 3,
+            gravity: 0.0025,
+            groundH: 90,
+            scrollSpeed: 0.18,
+            stage: 1,
+            stageTime: 0,
+            stageDuration: 40000,
+            fireBoostActive: false,
+            fireBoostTime: 0,
+            fireIntervalLevel: 1,
+            barrierActive: false,
+            barrierTime: 0,
+        };
+
+        this.config = {
+            fireIntervalNormal: 800,
+            fireIntervalBoost: 500,
+            fireIntervalBoostBoost: 200,
+
+        };
+
+        this.enemySpawnTimer = 1000;
+        this.obstacleSpawnTimer = 600;
+
+        this.invul = 0;
+        this.bullets = [];
+        this.enemies = [];
+        this.obstacles = [];
+        this.items = [];
+
+        this.enemySpawnTime = 0;
+        this.enemySpawnInterval = 1500;
+        this.obstacleSpawnTime = 0;
+        this.obstacleSpawnInterval = 900;
+        this.bgObstacle = 0;
+
+        this.bg = { near: 0, far: 0 };
+
+        this.nextSpawn = 800;
+        this.flashUntil = 0;
+
+        this.stageColors = [
+            ["#87CEFA", "#98FB98"],
+            ["#e1741cff", "#A1FFA1"],
+            ["#0e7a04ff", "#B4FFB4"],
+            ["#f3faf9ff", "#C4FFC4"],
+            ["#da59eeff", "#D0FFD0"],
+            ["#14053eff", "#D8FFE0"],
+            ["#222cf3ff", "#FFEAB0"],
+            ["#ebe80eff", "#FFD580"],
+            ["#72f0eaff", "#FFC060"],
+            ["#541003ff", "#FFA840"],
+        ];
+
+        this.player = new Player(this);
+        this.collision = new Collision(this);
+        this.input = new Input(this);
+        this.input.init();
     }
 
     reset() {

@@ -1,4 +1,5 @@
 import Item from "./item.js";
+import Utils from "./utils.js";
 
 export default class Input {
 
@@ -29,7 +30,7 @@ export default class Input {
                 ) {
                     b.alive = false;
 
-                    // ★ バリア持ちの場合（ステージ3〜）
+                    // ★ バリア持ちの場合
                     if (e.hasBarrier && e.hp === 2) {
                         e.hp = 1;          // バリアが割れる
                         e.hasBarrier = false;
@@ -69,6 +70,7 @@ export default class Input {
                     this.game.invul = 200;        // 連続当たり防止の短い無敵
                     return;                  // ← このフレームの残り衝突処理を打ち切る
                 }
+                console.log("Enemy hit player!", this.game.invul);
 
                 // ★ バリアがないときだけ通常ダメージ
                 if (this.game.invul === 0) {
@@ -104,6 +106,7 @@ export default class Input {
                     this.s.lives--;
                     this.game.flash(160);
                     this.game.invul = 400;
+                    this.s.fireIntervalLevel = Utils.downLevel(this.s.fireIntervalLevel, 1);
                     if (this.s.lives <= 0) this.game.gameOver();
                     return;
                 }
@@ -125,7 +128,7 @@ export default class Input {
 
                 if (it.type === "speed") {
                     this.s.fireBoostActive = true;
-                    this.s.fireInterval = this.s.fireIntervalBoost;
+                    this.s.fireIntervalLevel = Utils.upLevel(this.s.fireIntervalLevel, 3);
                 }
 
                 if (it.type === "barrier") {
