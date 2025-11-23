@@ -23,7 +23,7 @@ export default class Game {
       lastShot: 0,
       score: 0,
       lives: 3,
-      stage: 1,
+      stage: 2,
       stageTime: 0,
       scrollSpeed: 0,
       gravity: 0.0025,
@@ -91,6 +91,7 @@ export default class Game {
     this.collision = new Collision(this);
     this.input = new Input(this);
     Config.setStageParams(this);
+    this.bgm = new Audio("./audio/LowFi.m4a");
   }
 
   resizeCanvas() {
@@ -123,8 +124,8 @@ export default class Game {
       }
     }
 
-    if (this.invul > 0) {
-      this.invul = Math.max(0, this.invul - dt);
+    if (this.state.invul > 0) {
+      this.state.invul = Math.max(0, this.state.invul - dt);
     }
 
     // 背景スクロール
@@ -200,6 +201,7 @@ export default class Game {
     Renderer.drawBackground(this);
     Renderer.drawGround(this);
     Renderer.drawPlayer(this);
+    Renderer.drawStageView(this);
 
     this.ctx.fillStyle = "#a8c7ff";
     this.bullets.forEach((b) => this.ctx.fillRect(b.x, b.y, 15 * this.DPR, 4 * this.DPR));
@@ -213,26 +215,9 @@ export default class Game {
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    // ▼ ★★★★★ GAME OVER 表示（ここから追加） ★★★★★
     if (!this.state.running && this.state.lives <= 0) {
-
-      const ctx = this.ctx;
-      const w = this.canvas.width;
-      const h = this.canvas.height;
-
-      // 背景に薄く黒を敷く
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-      ctx.fillRect(0, 0, w, h);
-
-      // 文字スタイル
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${40 * this.DPR}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      ctx.fillText("GAME OVER", w / 2, h / 2);
+      Renderer.drawGameOver(this);
     }
-    // ★★★★★ 追加ここまで ★★★★★
   }
 
   togglePause() {
@@ -277,7 +262,7 @@ export default class Game {
 
     // player
     this.player.reset(this);
-    this.invul = 0;
+    this.state.invul = 0;
 
     // flash
     this.flashUntil = 0;
@@ -289,11 +274,16 @@ export default class Game {
 
     this.enemySpawnTimer = 1000;
     this.obstacleSpawnTimer = 600;
+
+    Utils.playBGM(this.bgm);
   }
 
   gameOver() {
     this.state.running = false;
     document.getElementById("pauseBtn").textContent = "▶ Resume";
+
+    this.bgm.pause();
+    this.bgm.currentTime = 0;
 
     // ★ Restart にフォーカスを移す
     const restartBtn = document.getElementById("restartBtn");

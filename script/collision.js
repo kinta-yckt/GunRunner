@@ -10,6 +10,7 @@ export default class Input {
     }
     handleCollisions() {
         this.battleBulletVsEnemy();
+        this.battleBulletVsObstacle();
         this.battleEnemyVsPlayer();
         this.battleObstacleVsPlayer();
         this.pickItem();
@@ -41,12 +42,31 @@ export default class Input {
                     e.hp -= 1;
                     if (e.hp <= 0) {
                         e.alive = false;
-                        this.s.score += 10 * e.tier;
+                        this.s.score += 10;
 
                         const types = ["speed", "barrier", "heal"];
                         const type = types[Math.floor(Math.random() * types.length)];
                         this.game.items.push(new Item(e.x, e.y, this.game, type));
                     }
+                }
+            });
+        });
+    }
+
+    battleBulletVsObstacle() {
+        this.game.bullets.forEach((b) => {
+            if (!b.alive) return;
+
+            this.game.obstacles.forEach((o) => {
+                if (!o.alive) return;
+
+                if (
+                    b.x < o.w + o.x &&
+                    b.x + 10 > o.x &&
+                    b.y < o.y + o.h &&
+                    b.y > o.y
+                ) {
+                    b.alive = false;
                 }
             });
         });
@@ -66,18 +86,16 @@ export default class Input {
                 if (this.s.barrierActive) {
                     this.s.barrierActive = false; // バリア消費
                     e.alive = false;         // 触れた敵は消す
-                    this.game.flash(200);
-                    this.game.invul = 200;        // 連続当たり防止の短い無敵
+                    this.game.state.invul = 200;        // 連続当たり防止の短い無敵
                     return;                  // ← このフレームの残り衝突処理を打ち切る
                 }
-                console.log("Enemy hit player!", this.game.invul);
 
                 // ★ バリアがないときだけ通常ダメージ
-                if (this.game.invul === 0) {
+                if (this.game.state.invul === 0) {
                     e.alive = false;
                     this.s.lives--;
-                    this.game.flash(160);
-                    this.game.invul = 400;
+                    this.game.flash(200);
+                    this.game.state.invul = 400;
                     if (this.s.lives <= 0) this.game.gameOver();
                     return;                  // このフレームの衝突処理は終わり
                 }
@@ -97,15 +115,16 @@ export default class Input {
                 if (this.s.barrierActive) {
                     this.s.barrierActive = false;
                     this.game.flash(200);
-                    this.game.invul = 200;  // 連続ヒット防止
+                    this.game.state.invul = 200;  // 連続ヒット防止
                     return;
                 }
-
+                console.log("Enemy hit player!", this.game.state.invul);
                 // ★ バリアがないときだけ減る
-                if (this.game.invul === 0) {
+                if (this.game.state.invul == 0) {
+                    console.log("barr", this.game.state.invul);
                     this.s.lives--;
                     this.game.flash(160);
-                    this.game.invul = 400;
+                    this.game.state.invul = 400;
                     this.s.fireIntervalLevel = Utils.downLevel(this.s.fireIntervalLevel, 1);
                     if (this.s.lives <= 0) this.game.gameOver();
                     return;

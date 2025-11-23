@@ -306,6 +306,35 @@ export default class Renderer {
         }
     }
 
+    static drawGameOver(game) {
+        const ctx = game.ctx;
+        const w = game.canvas.width;
+        const h = game.canvas.height;
 
+        // 背景に薄く黒を敷く
+        ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+        ctx.fillRect(0, 0, w, h);
 
+        // 文字スタイル
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `${40 * game.DPR}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.fillText("GAME OVER", w / 2, h / 2);
+    }
+
+    static drawStageView(game) {
+        const ctx = game.ctx;
+        const w = game.canvas.width;
+        const h = game.canvas.height;
+
+        // 文字スタイル
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `${24 * game.DPR}px Arial`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        ctx.fillText(`Stage ${game.state.stage}`, 20 * game.DPR, 20 * game.DPR);
+    }
 }

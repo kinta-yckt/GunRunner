@@ -4,7 +4,6 @@ export default class Input {
         this.game = game;
         this.jumpKeyDown = false;
 
-
         window.addEventListener(
             "keydown",
             (e) => {
@@ -15,7 +14,7 @@ export default class Input {
                         this.game.player.tryJump(this.state);
                     }
                 }
-                if (e.code === "KeyP") this.togglePause();
+                if (e.code === "KeyP") this.game.togglePause();
             },
             { passive: false }
         );

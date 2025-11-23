@@ -23,4 +23,10 @@ export default class Utils {
     static randomRange(min, max) {
         return Math.random() * (max - min) + min;
     }
+
+    static playBGM(bgm) {
+        bgm.loop = true;      // 🔁 無限ループ
+        bgm.volume = 0.5;     // 🔉 音量（0.0〜1.0）
+        bgm.play();          // ▶ 再生
+    }
 }
