@@ -275,14 +275,14 @@ export default class Game {
     this.enemySpawnTimer = 1000;
     this.obstacleSpawnTimer = 600;
 
-    Utils.playBGM(this.bgm);
+    // Utils.playBGM(this.bgm);
   }
 
   gameOver() {
     this.state.running = false;
     document.getElementById("pauseBtn").textContent = "▶ Resume";
 
-    this.bgm.pause();
+    //this.bgm.pause();
     this.bgm.currentTime = 0;
 
     // ★ Restart にフォーカスを移す
